@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -69,13 +70,17 @@ Tag64 term_tag64(Term term) {
     return term & TAG_MASK;
 }
 
-double
+float
 bench_diff_sec(struct timespec start, struct timespec end) {
   return (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
 }
 
+void sink(Term v) { __asm__ volatile("" : : "r"(v)); }
+
 int main() {
     const size_t ITER = 1000000000ULL;
+
+    volatile Term v = 0;
 
     Term acc = 0;
     struct timespec start, end;
@@ -91,6 +96,7 @@ int main() {
         acc ^= term_new(i % 256, i % 256, i);
     }
     clock_gettime(CLOCK_MONOTONIC, &end);
+    sink(acc);
 
     diff = bench_diff_sec(start, end);
     diff_old += diff;
@@ -101,6 +107,7 @@ int main() {
         acc ^= term_new64(i % 256, i % 256, i);
     }
     clock_gettime(CLOCK_MONOTONIC, &end);
+    sink(acc);
 
     diff = bench_diff_sec(start, end);
     diff_new += diff;
@@ -110,10 +117,13 @@ int main() {
 
     clock_gettime(CLOCK_MONOTONIC, &start);
     for (size_t i = 0; i < ITER; ++i) {
-        Term t = acc ^ i;
-        acc ^= term_tag(t);
+      acc++;
+      Term t = acc ^ i;
+      acc ^= term_tag(t);
     }
     clock_gettime(CLOCK_MONOTONIC, &end);
+    sink(acc);
+    v += acc;
 
     diff = bench_diff_sec(start, end);
     diff_old += diff;
@@ -121,10 +131,13 @@ int main() {
 
     clock_gettime(CLOCK_MONOTONIC, &start);
     for (size_t i = 0; i < ITER; ++i) {
-        Term t = acc ^ i;
-        acc ^= term_tag64(t);
+      acc++;
+      Term t = acc ^ i;
+      acc ^= term_tag64(t);
     }
     clock_gettime(CLOCK_MONOTONIC, &end);
+    sink(acc);
+    v += acc;
 
     diff = bench_diff_sec(start, end);
     diff_new += diff;
@@ -138,6 +151,7 @@ int main() {
         acc ^= term_lab(t);
     }
     clock_gettime(CLOCK_MONOTONIC, &end);
+    sink(acc);
 
     diff = bench_diff_sec(start, end);
     diff_old += diff;
@@ -149,6 +163,7 @@ int main() {
         acc ^= term_lab64(t);
     }
     clock_gettime(CLOCK_MONOTONIC, &end);
+    sink(acc);
 
     diff = bench_diff_sec(start, end);
     diff_new += diff;
@@ -162,6 +177,7 @@ int main() {
         acc ^= term_loc(t);
     }
     clock_gettime(CLOCK_MONOTONIC, &end);
+    sink(acc);
 
     diff = bench_diff_sec(start, end);
     diff_old += diff;
@@ -173,14 +189,15 @@ int main() {
         acc ^= term_loc64(t);
     }
     clock_gettime(CLOCK_MONOTONIC, &end);
+    sink(acc);
 
     diff = bench_diff_sec(start, end);
     diff_new += diff;
     printf("term_loc64: %.6f sec\n", diff);
 
-    printf("old total: %.2f sec\nnew total: %2.f sec\nacc: %llu\n", diff_old,
-        diff_new, (unsigned long long)acc);
+    printf("old total: %.2f sec\nnew total: %2.f sec\n", diff_old,
+        diff_new);
 
-    return 0;
+    return v;
 }
 
